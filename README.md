@@ -364,6 +364,14 @@ nothing on screen to say so. It is now derived: the engine's snapshot
 carries the configuration it is actually running with, and the banner is
 a comparison against it. Derived state cannot go stale.
 
+**The app filtered itself out of its own stream.** The capturer excluded
+its own process from the `SCContentFilter`, which was right when the
+agent was headless and had no UI worth seeing. Once it became a real app
+with a dashboard, the one window you might actually want to reach from
+the phone — to change quality, or to stop sharing — was the only window
+you could not see. Nothing is excluded now; there is no feedback loop to
+avoid, because the Mac app renders numbers, never the video.
+
 **A `repeatForever` animation never stopped.** The status dot pulses
 while a device is connected. Setting its animated value back to `false`
 does not cancel a `repeatForever` — the view keeps redrawing at display

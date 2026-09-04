@@ -65,13 +65,18 @@ final class ScreenCapturer: NSObject, SCStreamOutput, SCStreamDelegate {
         self.geometry = geometry
         self.display = display
 
-        // Exclude our own process so we never capture the agent's own UI.
-        let ourApp = content.applications.first {
-            $0.bundleIdentifier == Bundle.main.bundleIdentifier
-        }
+        // Capture the display exactly as it looks — nothing excluded.
+        //
+        // This used to filter out our own process, which made sense when
+        // the agent was headless and had no UI worth seeing. Now that it
+        // is a real app with a dashboard, excluding it meant the one
+        // window you might actually want to reach from the phone — to
+        // change quality, or to stop sharing — was the one window you
+        // could not see. There is no feedback loop to worry about: the
+        // Mac app shows numbers, never the video.
         let filter = SCContentFilter(
             display: display,
-            excludingApplications: ourApp.map { [$0] } ?? [],
+            excludingApplications: [],
             exceptingWindows: []
         )
 
