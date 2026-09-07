@@ -15,6 +15,8 @@ struct ViewerOptions {
     var inputTest = false
     var protocolTest = false
     var qualityTest = false
+    var screenshotTest = false
+    var gesture: SystemGesture?
 }
 
 func parseViewerArguments() -> ViewerOptions {
@@ -36,6 +38,17 @@ func parseViewerArguments() -> ViewerOptions {
         case "--input-test": options.inputTest = true
         case "--protocol-test": options.protocolTest = true
         case "--quality-test": options.qualityTest = true
+        case "--screenshot-test": options.screenshotTest = true
+        case "--gesture":
+            if let v = value() {
+                switch v {
+                case "mission":  options.gesture = .missionControl
+                case "desktop":  options.gesture = .showDesktop
+                case "back":     options.gesture = .navigateBack
+                case "forward":  options.gesture = .navigateForward
+                default: Log.warn("unknown gesture: \(v)")
+                }
+            }
         case "--help", "-h":
             print("""
             ControlMyMacViewer (M1)
@@ -46,6 +59,8 @@ func parseViewerArguments() -> ViewerOptions {
               --input-test        move the real cursor and verify it landed
               --protocol-test     round-trip every message type (offline)
               --quality-test      switch resolution mid-stream and verify
+              --screenshot-test   request a still and check it is full resolution
+              --gesture <name>    mission | desktop | back | forward
             """)
             exit(0)
         default:
@@ -69,6 +84,23 @@ func runViewer() async -> Int32 {
 
     if options.inputTest {
         return await InputTest.run(host: options.host, port: options.port)
+    }
+
+    if let gesture = options.gesture {
+        let client = VideoStreamClient(host: options.host, port: options.port,
+                                       clientName: "gesture-test")
+        client.connect()
+        try? await Task.sleep(nanoseconds: 1_200_000_000)
+        client.sendGesture(gesture)
+        Log.info("sent \(gesture.label)")
+        try? await Task.sleep(nanoseconds: 600_000_000)
+        client.disconnect()
+        return 0
+    }
+
+    if options.screenshotTest {
+        return await ScreenshotTest.run(host: options.host, port: options.port,
+                                        output: options.output)
     }
 
     let sink = options.output.map { MP4FileSink(url: $0) }

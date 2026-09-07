@@ -11,7 +11,7 @@ import Foundation
 ///
 /// All multi-byte integers are big-endian.
 public enum Wire {
-    public static let protocolVersion: UInt16 = 1
+    public static let protocolVersion: UInt16 = 2
     public static let defaultPort: UInt16 = 47_800
     /// Refuse absurd lengths rather than allocating whatever a peer claims.
     public static let maxMessageBytes = 16 * 1024 * 1024
@@ -29,8 +29,11 @@ public enum MessageType: UInt8 {
     case scroll          = 0x32   // client -> server
     case keyEvent        = 0x33   // client -> server
     case textInput       = 0x34   // client -> server
+    case gesture         = 0x35   // client -> server
     case setQuality      = 0x40   // client -> server
     case qualityChanged  = 0x41   // server -> client
+    case requestScreenshot = 0x50 // client -> server
+    case screenshot      = 0x51   // server -> client
 }
 
 public enum QualityMode: UInt8 {
@@ -130,6 +133,52 @@ public enum VirtualKey {
     public static func code(for character: Character) -> UInt16? {
         byCharacter[Character(character.lowercased())]
     }
+}
+
+/// A system-level action, named by what it *does* rather than by the
+/// finger motion that would normally invoke it.
+///
+/// macOS delivers real trackpad gestures as `NSEventTypeSwipe`, which
+/// has no public initialiser — only the window server creates those. So
+/// the client says which action it wants and the agent invokes it
+/// directly. What it does *not* do is synthesise Ctrl-arrow: on macOS
+/// 27 the window server ignores synthetic key events for its own
+/// hotkeys, verified twice, so anything routed that way silently does
+/// nothing.
+///
+/// Switching Spaces is absent for exactly that reason: it exists only
+/// as a window-server hotkey, and there is no other way in. Swiping
+/// sideways navigates back and forward instead, which is at least what
+/// a two-finger swipe does on real hardware.
+/// Only actions with a mechanism that was actually observed to work are
+/// here. App Exposé and Launchpad were tried and dropped: neither the
+/// hotkey nor the Dock notification moved them, and a gesture that
+/// silently does nothing is worse than one that does not exist.
+public enum SystemGesture: UInt8, CaseIterable, Sendable {
+    case missionControl  = 0
+    case showDesktop     = 1
+    case navigateBack    = 2
+    case navigateForward = 3
+
+    public var label: String {
+        switch self {
+        case .missionControl:  return "Mission Control"
+        case .showDesktop:     return "Show Desktop"
+        case .navigateBack:    return "Back"
+        case .navigateForward: return "Forward"
+        }
+    }
+}
+
+/// HEIC unless asked otherwise: a full-resolution desktop is 2.2 MB as
+/// PNG and 0.5 MB as HEIC at quality 0.9, with no visible difference on
+/// screen content — and that ratio is the difference between a
+/// screenshot arriving now and arriving eventually over cellular.
+public enum ScreenshotFormat: UInt8, Sendable {
+    case heic = 0
+    case png  = 1
+
+    public var fileExtension: String { self == .heic ? "heic" : "png" }
 }
 
 public enum PointerMoveMode: UInt8 {
@@ -273,13 +322,29 @@ public struct PointerButtonMessage {
     }
 }
 
+/// Where a scroll sits in a gesture, so macOS can treat a run of these
+/// as one continuous trackpad scroll rather than as unrelated wheel
+/// clicks. Without it there is no rubber-banding at the end of a list
+/// and no swipe-to-go-back in a browser — both are driven by the phase
+/// fields, not by the deltas.
+public enum ScrollPhase: UInt8, Sendable {
+    case began     = 0
+    case changed   = 1
+    case ended     = 2
+    /// Post-lift glide, generated on the phone from the flick velocity.
+    case momentum  = 3
+    case momentumEnded = 4
+}
+
 public struct ScrollMessage {
     public var deltaX: Int32
     public var deltaY: Int32
+    public var phase: ScrollPhase
 
-    public init(deltaX: Int32, deltaY: Int32) {
+    public init(deltaX: Int32, deltaY: Int32, phase: ScrollPhase = .changed) {
         self.deltaX = deltaX
         self.deltaY = deltaY
+        self.phase = phase
     }
 }
 
@@ -303,6 +368,42 @@ public struct KeyEventMessage {
 public struct TextInputMessage {
     public var text: String
     public init(text: String) { self.text = text }
+}
+
+public struct GestureMessage {
+    public var gesture: SystemGesture
+    public init(gesture: SystemGesture) { self.gesture = gesture }
+}
+
+public struct RequestScreenshotMessage {
+    public var format: ScreenshotFormat
+    public init(format: ScreenshotFormat = .heic) { self.format = format }
+}
+
+/// The image travels whole rather than chunked. It is a deliberate,
+/// occasional action, and at half a megabyte the video stall while it
+/// goes out is shorter than the pause between deciding to take a
+/// screenshot and looking at it.
+public struct ScreenshotMessage {
+    public var succeeded: Bool
+    public var format: ScreenshotFormat
+    public var width: UInt16
+    public var height: UInt16
+    /// Empty on success; the reason on failure, so the phone can say
+    /// what went wrong instead of just spinning.
+    public var message: String
+    public var data: Data
+
+    public init(succeeded: Bool, format: ScreenshotFormat,
+                width: UInt16, height: UInt16,
+                message: String = "", data: Data = Data()) {
+        self.succeeded = succeeded
+        self.format = format
+        self.width = width
+        self.height = height
+        self.message = message
+        self.data = data
+    }
 }
 
 public struct SetQualityMessage {
@@ -348,8 +449,11 @@ public enum Message {
     case scroll(ScrollMessage)
     case keyEvent(KeyEventMessage)
     case textInput(TextInputMessage)
+    case gesture(GestureMessage)
     case setQuality(SetQualityMessage)
     case qualityChanged(QualityChangedMessage)
+    case requestScreenshot(RequestScreenshotMessage)
+    case screenshot(ScreenshotMessage)
 }
 
 public enum WireError: LocalizedError {

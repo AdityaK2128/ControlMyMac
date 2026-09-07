@@ -65,6 +65,7 @@ public extension Message {
             body.u8(MessageType.scroll.rawValue)
             body.i32(m.deltaX)
             body.i32(m.deltaY)
+            body.u8(m.phase.rawValue)
 
         case .keyEvent(let m):
             body.u8(MessageType.keyEvent.rawValue)
@@ -75,6 +76,23 @@ public extension Message {
         case .textInput(let m):
             body.u8(MessageType.textInput.rawValue)
             body.bytes(Data(m.text.utf8))
+
+        case .gesture(let m):
+            body.u8(MessageType.gesture.rawValue)
+            body.u8(m.gesture.rawValue)
+
+        case .requestScreenshot(let m):
+            body.u8(MessageType.requestScreenshot.rawValue)
+            body.u8(m.format.rawValue)
+
+        case .screenshot(let m):
+            body.u8(MessageType.screenshot.rawValue)
+            body.u8(m.succeeded ? 1 : 0)
+            body.u8(m.format.rawValue)
+            body.u16(m.width)
+            body.u16(m.height)
+            body.string(m.message)
+            body.bytes(m.data)
 
         case .setQuality(let m):
             body.u8(MessageType.setQuality.rawValue)
@@ -169,7 +187,12 @@ public extension Message {
                                                        clickCount: try r.u8()))
 
         case .scroll:
-            return .scroll(ScrollMessage(deltaX: try r.i32(), deltaY: try r.i32()))
+            let dx = try r.i32()
+            let dy = try r.i32()
+            guard let phase = ScrollPhase(rawValue: try r.u8()) else {
+                throw WireError.badValue("scroll phase")
+            }
+            return .scroll(ScrollMessage(deltaX: dx, deltaY: dy, phase: phase))
 
         case .keyEvent:
             return .keyEvent(KeyEventMessage(keyCode: try r.u16(),
@@ -178,6 +201,30 @@ public extension Message {
 
         case .textInput:
             return .textInput(TextInputMessage(text: String(decoding: r.rest(), as: UTF8.self)))
+
+        case .gesture:
+            guard let gesture = SystemGesture(rawValue: try r.u8()) else {
+                throw WireError.badValue("system gesture")
+            }
+            return .gesture(GestureMessage(gesture: gesture))
+
+        case .requestScreenshot:
+            guard let format = ScreenshotFormat(rawValue: try r.u8()) else {
+                throw WireError.badValue("screenshot format")
+            }
+            return .requestScreenshot(RequestScreenshotMessage(format: format))
+
+        case .screenshot:
+            let succeeded = try r.u8() == 1
+            guard let format = ScreenshotFormat(rawValue: try r.u8()) else {
+                throw WireError.badValue("screenshot format")
+            }
+            let width = try r.u16()
+            let height = try r.u16()
+            let message = try r.string()
+            return .screenshot(ScreenshotMessage(succeeded: succeeded, format: format,
+                                                 width: width, height: height,
+                                                 message: message, data: r.rest()))
 
         case .setQuality:
             guard let mode = QualityMode(rawValue: try r.u8()) else {

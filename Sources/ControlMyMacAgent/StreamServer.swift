@@ -29,6 +29,11 @@ final class StreamServer: VideoSink {
     var onKeyframeRequest: (() -> Void)?
     /// Raised when a client picks a quality, or asks for auto.
     var onQualityRequest: ((SetQualityMessage) -> Void)?
+    /// Raised when a client asks for a still. The reply closure sends it
+    /// back on the same connection the request arrived on — a plain
+    /// request/response, rather than pushing it down the video channel
+    /// and stalling frames for a client that never asked.
+    var onScreenshotRequest: ((ScreenshotFormat, @escaping (ScreenshotMessage) -> Void) -> Void)?
     /// Raised on the first client connecting and the last disconnecting,
     /// so the agent can manage display sleep around real usage.
     var onViewersChanged: ((Int) -> Void)?
@@ -235,10 +240,18 @@ final class StreamServer: VideoSink {
                 self.input.handlePointerButton(button)
             case .scroll(let scroll):
                 self.input.handleScroll(scroll)
+            case .gesture(let gesture):
+                self.input.handleGesture(gesture)
             case .keyEvent(let key):
                 self.input.handleKeyEvent(key)
             case .textInput(let text):
                 self.input.handleTextInput(text)
+            case .requestScreenshot(let request):
+                Log.info("screenshot requested by \(peer)")
+                self.onScreenshotRequest?(request.format) { [weak message] result in
+                    message?.send(.screenshot(result))
+                }
+
             case .setQuality(let quality):
                 Log.info("client \(peer) requested quality: mode=\(quality.mode == .auto ? "auto" : "manual") width=\(quality.width) bitrate=\(quality.bitrate)")
                 self.onQualityRequest?(quality)

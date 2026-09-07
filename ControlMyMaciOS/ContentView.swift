@@ -81,13 +81,15 @@ struct ContentView: View {
                 ZStack {
                     TrackpadView(
                     onMove:   { model.pointerMove($0) },
-                    onScroll: { model.scroll($0) },
+                    onScroll: { model.scroll($0, phase: $1) },
                     onClick:  { model.click($0, clickCount: $1) },
                     onButton: { model.button($0, isDown: $1) },
                     onDragEngaged: { model.dragLock = $0 },
                     onShowSettings: { model.showSettings = true },
+                    onGesture: { model.performGesture($0) },
                     dragLock: model.dragLock,
-                    maxAcceleration: model.maxAcceleration
+                    maxAcceleration: model.maxAcceleration,
+                    momentumScrolling: model.momentumScrolling
                 )
                     .onAppear { model.viewSize = geometry.size }
                     .onChange(of: geometry.size) { _, new in model.viewSize = new }
@@ -120,6 +122,9 @@ struct ContentView: View {
                 } else if let notice = model.bandwidthNotice {
                     bandwidthBanner(notice)
                 }
+                if let status = model.screenshotStatus {
+                    statusToast(status)
+                }
                 Spacer()
                 if model.keyboardActive {
                     // Left inside the keyboard's safe area, unlike the
@@ -135,6 +140,7 @@ struct ContentView: View {
             }
         }
         .animation(.easeInOut(duration: 0.25), value: model.bandwidthNotice)
+        .animation(.easeInOut(duration: 0.2), value: model.screenshotStatus)
         .sheet(isPresented: $model.showSettings) {
             SettingsSheet(model: model)
         }
@@ -164,6 +170,21 @@ struct ContentView: View {
 
     /// Without the old status pill there is nothing to distinguish a
     /// dropped connection from a frozen frame, so say so explicitly.
+    /// Brief confirmation over the video — a screenshot saving, or a
+    /// gesture going out. Deliberately transient: a remote desktop needs
+    /// every pixel, so nothing here stays.
+    private func statusToast(_ text: String) -> some View {
+        Text(text)
+            .font(.footnote.weight(.medium))
+            .foregroundStyle(.white)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+            .background(.black.opacity(0.65), in: Capsule())
+            .overlay(Capsule().strokeBorder(.white.opacity(0.15), lineWidth: 1))
+            .padding(.top, 8)
+            .transition(.move(edge: .top).combined(with: .opacity))
+    }
+
     private func disconnectedBanner(_ reason: String) -> some View {
         HStack(spacing: 10) {
             Image(systemName: "exclamationmark.triangle.fill")

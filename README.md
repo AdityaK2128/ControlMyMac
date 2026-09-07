@@ -94,6 +94,46 @@ it later silently throws away the Screen Recording and Accessibility
 permissions already granted, with no error to explain why capture
 suddenly fails.
 
+## Gestures and screenshots
+
+**Screenshots** are captured from the display, not from the video. The
+stream has already been scaled to whatever rung the link can carry, so a
+still grabbed from it would be an artefact of the network rather than a
+picture of the screen. `SCScreenshotManager` gives the panel natively —
+3456x2234 here — encoded as HEIC and saved straight into the phone's
+photo library. HEIC because that same frame is 2.21 MB as PNG and
+0.53 MB as HEIC at quality 0.9, with nothing visible lost on screen
+content, and over cellular that ratio is the whole experience.
+
+**Gestures** are the awkward half. macOS delivers real trackpad swipes
+as `NSEventTypeSwipe`, which has no public initialiser — only the window
+server makes those. So the phone names an *action* and the agent invokes
+it directly. Each mechanism below was chosen by trying it and
+screenshotting the result, because the obvious one does not work:
+
+| Action | Mechanism | Works |
+|---|---|---|
+| Ctrl-arrow hotkeys | synthetic `CGEvent` | **no** — the window server ignores synthetic key events for its own hotkeys, even with Accessibility granted |
+| Mission Control | launch `/System/Applications/Mission Control.app` | yes |
+| Show Desktop | `CoreDockSendNotification("com.apple.showdesktop.awake")` | yes |
+| Mission Control | `CoreDockSendNotification("com.apple.expose.awake")` | no, though showdesktop's twin works |
+| Back / Forward | synthetic Cmd-[ and Cmd-] | yes — application shortcuts are not window-server hotkeys |
+
+Switching Spaces is deliberately absent. It exists *only* as a window
+server hotkey, so there is no route to it at all; shipping a swipe that
+silently does nothing would be worse than leaving it out. Sideways
+swipes navigate back and forward instead.
+
+`CoreDockSendNotification` is private API, resolved with `dlsym` so a
+future macOS removing it produces a logged warning rather than an app
+that will not launch.
+
+**Scrolling** carries a phase — began, changed, ended, momentum — so
+macOS treats a run of events as one continuous gesture. Rubber-banding
+at the end of a list keys off those fields and ignores the deltas
+entirely. Momentum after a flick is generated on the phone, because
+macOS will not add glide to synthetic events.
+
 ## Idle by default
 
 Capture and encoding only run while a device is connected. With nobody
@@ -363,6 +403,13 @@ pane and back silently cleared it, leaving an unapplied change with
 nothing on screen to say so. It is now derived: the engine's snapshot
 carries the configuration it is actually running with, and the banner is
 a comparison against it. Derived state cannot go stale.
+
+**The control channel could not hear a reply.** It was send-only for
+its whole life — the client talked, the server listened — so when
+screenshots gave the server something to say back, the reply arrived,
+sat unread in the receive buffer, and the request looked like it had
+timed out. The server log said it had captured and sent 0.51 MB. Both
+ends were right; nobody was listening.
 
 **The app filtered itself out of its own stream.** The capturer excluded
 its own process from the `SCContentFilter`, which was right when the

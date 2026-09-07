@@ -31,6 +31,9 @@ public final class VideoStreamClient {
     public var onFrame: ((CMSampleBuffer, VideoFrameMessage) -> Void)?
     public var onFormat: ((CMFormatDescription, VideoFormatMessage) -> Void)?
     public var onServerInfo: ((ServerInfoMessage) -> Void)?
+    /// A still the Mac sent back after `requestScreenshot`. Fires on the
+    /// client's internal queue like every other callback here.
+    public var onScreenshot: ((ScreenshotMessage) -> Void)?
     public var onQualityChanged: ((QualityChangedMessage) -> Void)?
     public var onState: ((State) -> Void)?
 
@@ -114,6 +117,11 @@ public final class VideoStreamClient {
             // rather than waiting for the next scheduled one.
             controlConnection.send(.requestKeyframe)
         }
+        // The control channel was send-only until screenshots gave the
+        // server something to say back on it. Without a handler here the
+        // reply arrives, sits in the receive buffer, and the request
+        // looks like it timed out.
+        controlConnection.onMessage = { [weak self] in self?.handle($0) }
         controlConnection.start()
         control = controlConnection
     }
@@ -156,8 +164,21 @@ public final class VideoStreamClient {
         sendPointerButton(button, isDown: false, clickCount: clickCount)
     }
 
-    public func sendScroll(dx: Int32, dy: Int32) {
-        control?.send(.scroll(ScrollMessage(deltaX: dx, deltaY: dy)))
+    public func sendScroll(dx: Int32, dy: Int32, phase: ScrollPhase = .changed) {
+        control?.send(.scroll(ScrollMessage(deltaX: dx, deltaY: dy, phase: phase)))
+    }
+
+    /// Ask the Mac to perform a system gesture — Mission Control and
+    /// friends. Named by action rather than by finger count, because the
+    /// agent invokes it by shortcut and never sees a swipe.
+    public func sendGesture(_ gesture: SystemGesture) {
+        control?.send(.gesture(GestureMessage(gesture: gesture)))
+    }
+
+    /// Request a full-resolution still. The reply arrives on
+    /// `onScreenshot`, on the same channel this went out on.
+    public func requestScreenshot(format: ScreenshotFormat = .heic) {
+        control?.send(.requestScreenshot(RequestScreenshotMessage(format: format)))
     }
 
     public func sendKey(_ keyCode: UInt16, modifiers: KeyModifiers = []) {
@@ -191,6 +212,9 @@ public final class VideoStreamClient {
         switch message {
         case .serverInfo(let info):
             onServerInfo?(info)
+
+        case .screenshot(let shot):
+            onScreenshot?(shot)
 
         case .qualityChanged(let quality):
             onQualityChanged?(quality)

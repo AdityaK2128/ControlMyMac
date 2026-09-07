@@ -1,5 +1,6 @@
 import ApplicationServices
 import Carbon
+import AppKit
 import ControlMyMacKit
 import CoreGraphics
 import Foundation
@@ -196,15 +197,112 @@ final class InputInjector {
     }
 
     func handleScroll(_ message: ScrollMessage) {
-        post(CGEvent(scrollWheelEvent2Source: source,
-                     units: .pixel,
-                     wheelCount: 2,
-                     wheel1: Int32(clamping: message.deltaY),
-                     wheel2: Int32(clamping: message.deltaX),
-                     wheel3: 0))
+        guard let event = CGEvent(scrollWheelEvent2Source: source,
+                                  units: .pixel,
+                                  wheelCount: 2,
+                                  wheel1: Int32(clamping: message.deltaY),
+                                  wheel2: Int32(clamping: message.deltaX),
+                                  wheel3: 0) else { return }
+
+        // Tagging the run with a phase is what makes macOS treat it as
+        // one continuous trackpad scroll instead of a burst of unrelated
+        // wheel clicks. Rubber-banding at the end of a list and
+        // swipe-to-go-back in a browser both key off these fields and
+        // ignore the deltas entirely.
+        //
+        // Phase and momentum phase are mutually exclusive: an event
+        // carrying both is discarded, which looks exactly like scrolling
+        // being broken.
+        switch message.phase {
+        case .began:
+            event.setIntegerValueField(.scrollWheelEventScrollPhase, value: 1)   // kCGScrollPhaseBegan
+        case .changed:
+            event.setIntegerValueField(.scrollWheelEventScrollPhase, value: 2)   // kCGScrollPhaseChanged
+        case .ended:
+            event.setIntegerValueField(.scrollWheelEventScrollPhase, value: 4)   // kCGScrollPhaseEnded
+        case .momentum:
+            event.setIntegerValueField(.scrollWheelEventMomentumPhase, value: 2) // continue
+        case .momentumEnded:
+            event.setIntegerValueField(.scrollWheelEventMomentumPhase, value: 3) // end
+        }
+        post(event)
     }
 
-    // MARK: - Keyboard
+    // MARK: - System gestures
+
+    /// The Dock's own notification entry point.
+    ///
+    /// This is private API, and that is a deliberate, tested choice
+    /// rather than a shortcut. The supported route — synthesising the
+    /// Ctrl-arrow hotkeys — does not work: on macOS 27 the window
+    /// server ignores synthetic key events for its own hotkeys even
+    /// from a process holding Accessibility, which was verified by
+    /// posting them and screenshotting the result. This call works,
+    /// needs no permission at all, and is the same mechanism every
+    /// third-party window manager on the platform uses.
+    ///
+    /// Resolved at runtime rather than linked, so if a future macOS
+    /// removes it the result is a logged warning instead of an app that
+    /// will not launch.
+    private static let dockNotify: (@convention(c) (CFString, Int32) -> Void)? = {
+        guard let handle = dlopen(
+            "/System/Library/Frameworks/ApplicationServices.framework/ApplicationServices",
+            RTLD_LAZY),
+            let symbol = dlsym(handle, "CoreDockSendNotification") else {
+            Log.warn("CoreDockSendNotification is unavailable — Mission Control and friends will not work")
+            return nil
+        }
+        return unsafeBitCast(symbol, to: (@convention(c) (CFString, Int32) -> Void).self)
+    }()
+
+    func handleGesture(_ message: GestureMessage) {
+        guard isEnabled else { return }
+
+        switch message.gesture {
+        // Launching the app is what actually opens Mission Control.
+        // Its Dock notification, com.apple.expose.awake, does nothing
+        // on macOS 27 — unlike showdesktop's, which still works. Both
+        // were tested by firing them and screenshotting the result.
+        case .missionControl:  launchMissionControl()
+        case .showDesktop:     sendToDock("com.apple.showdesktop.awake")
+
+        // Back and forward are ordinary application shortcuts rather
+        // than window-server hotkeys, so these do go through as
+        // synthetic key events.
+        case .navigateBack:    sendShortcut(key: 33, label: message.gesture.label)   // [
+        case .navigateForward: sendShortcut(key: 30, label: message.gesture.label)   // ]
+        }
+    }
+
+    private func launchMissionControl() {
+        let app = URL(fileURLWithPath: "/System/Applications/Mission Control.app")
+        guard FileManager.default.fileExists(atPath: app.path) else {
+            Log.warn("Mission Control.app is not present")
+            return
+        }
+        NSWorkspace.shared.openApplication(at: app,
+                                           configuration: NSWorkspace.OpenConfiguration()) { _, error in
+            if let error { Log.warn("Mission Control: \(error.localizedDescription)") }
+        }
+        Log.info("gesture: Mission Control (launched)")
+    }
+
+    private func sendToDock(_ notification: String) {
+        guard let notify = Self.dockNotify else { return }
+        notify(notification as CFString, 0)
+        Log.info("gesture: \(notification)")
+    }
+
+    private func sendShortcut(key: CGKeyCode, label: String) {
+        guard let down = CGEvent(keyboardEventSource: source, virtualKey: key, keyDown: true),
+              let up = CGEvent(keyboardEventSource: source, virtualKey: key, keyDown: false)
+        else { return }
+        down.flags = .maskCommand
+        up.flags = .maskCommand
+        post(down)
+        post(up)
+        Log.info("gesture: \(label) (cmd+key)")
+    }
 
     /// True when some app has enabled secure event input — a focused
     /// password field, a password manager, Terminal's secure keyboard

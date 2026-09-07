@@ -73,6 +73,9 @@ cat > "$APP/Info.plist" <<PLIST
          local network. Without this the first connection is refused. -->
     <key>NSLocalNetworkUsageDescription</key>
     <string>ControlMyMac connects to your Mac over your Tailscale network to show its screen.</string>
+    <!-- Add-only: screenshots go in, nothing is ever read back out. -->
+    <key>NSPhotoLibraryAddUsageDescription</key>
+    <string>ControlMyMac saves screenshots of your Mac's screen to your photo library.</string>
     <key>CFBundleSupportedPlatforms</key><array><string>iPhoneSimulator</string></array>
     <key>DTPlatformName</key><string>iphonesimulator</string>
 </dict>

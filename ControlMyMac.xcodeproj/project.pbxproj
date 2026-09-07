@@ -191,6 +191,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = ControlMyMac;
 				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "ControlMyMac connects to your Mac over your Tailscale network to show its screen.";
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "ControlMyMac saves screenshots of your Mac's screen to your photo library.";
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
@@ -218,6 +219,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = ControlMyMac;
 				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "ControlMyMac connects to your Mac over your Tailscale network to show its screen.";
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "ControlMyMac saves screenshots of your Mac's screen to your photo library.";
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;

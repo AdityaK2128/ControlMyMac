@@ -4,6 +4,16 @@ import SwiftUI
 ///
 /// A remote desktop wants the whole screen, so none of this is visible
 /// until asked for — three fingers on the trackpad brings it up.
+private func gestureRow(_ gesture: String, _ action: String) -> some View {
+    HStack {
+        Text(gesture)
+        Spacer()
+        Text(action)
+            .foregroundStyle(.secondary)
+    }
+    .font(.callout)
+}
+
 struct SettingsSheet: View {
     @ObservedObject var model: StreamViewModel
     @Environment(\.dismiss) private var dismiss
@@ -49,10 +59,24 @@ struct SettingsSheet: View {
                     slider("Acceleration", value: $model.maxAcceleration, range: 1.0...4.0)
                     slider("Scroll speed", value: $model.scrollSensitivity, range: 0.5...6.0)
                     Toggle("Invert scroll", isOn: $model.invertScroll)
+                    Toggle("Momentum scrolling", isOn: $model.momentumScrolling)
                 } header: {
                     Text("Input")
                 } footer: {
                     Text("Jitter is the spread of frame arrival times, not latency — the two clocks are never in sync, so only the variation is meaningful.")
+                }
+
+                Section {
+                    Button {
+                        dismiss()
+                        model.takeScreenshot()
+                    } label: {
+                        Label("Take Screenshot", systemImage: "camera.viewfinder")
+                    }
+                } header: {
+                    Text("Screenshot")
+                } footer: {
+                    Text("Captures the Mac's display at full resolution — not the scaled-down video — and saves it straight to your Photos library.")
                 }
 
                 Section {
@@ -65,6 +89,20 @@ struct SettingsSheet: View {
                     Text(model.showKeyboardButton
                          ? "Drag the button anywhere it's out of the way. Turn it off to keep the screen clear — the keyboard is still available here."
                          : "The keyboard can only be opened from this panel while the floating button is off.")
+                }
+
+                Section {
+                    gestureRow("Three fingers up", "Mission Control")
+                    gestureRow("Three fingers down", "Show Desktop")
+                    gestureRow("Three fingers right", "Back")
+                    gestureRow("Three fingers left", "Forward")
+                    gestureRow("Three-finger tap", "This panel")
+                    gestureRow("Two-finger tap", "Right click")
+                    gestureRow("Press and hold", "Drag")
+                } header: {
+                    Text("Gestures")
+                } footer: {
+                    Text("The Mac cannot receive a synthetic trackpad swipe, so these ask it to perform the action directly. Switching Spaces is missing because it exists only as a window-server hotkey, and those ignore synthetic input entirely.")
                 }
 
                 Section {

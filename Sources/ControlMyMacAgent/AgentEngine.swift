@@ -157,6 +157,12 @@ final class AgentEngine {
             }
         }
 
+        server.onScreenshotRequest = { format, reply in
+            Task {
+                reply(await Screenshotter.capture(format: format))
+            }
+        }
+
         quality.onChange = { [weak self, weak server] level, reason, levelChanged in
             Task {
                 guard let self, let server else { return }

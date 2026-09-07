@@ -1,7 +1,9 @@
 import Combine
 import CoreMedia
 import Foundation
+import Photos
 import UIKit
+import UniformTypeIdentifiers
 
 @MainActor
 final class StreamViewModel: ObservableObject {
@@ -47,6 +49,17 @@ final class StreamViewModel: ObservableObject {
         didSet { UserDefaults.standard.set(invertScroll, forKey: "invertScroll") }
     }
     @Published var showSettings = false
+
+    /// Glide after a flick. A matter of taste, so it is a preference
+    /// rather than a constant.
+    @Published var momentumScrolling: Bool {
+        didSet { UserDefaults.standard.set(momentumScrolling, forKey: "momentumScrolling") }
+    }
+
+    /// What the screenshot is doing right now, shown briefly over the
+    /// video. Nil when there is nothing to say.
+    @Published private(set) var screenshotStatus: String?
+    private var screenshotStatusTask: Task<Void, Never>?
 
     /// The floating keyboard button. Optional, because on a small screen
     /// any permanent control is in the way some of the time.
@@ -105,6 +118,7 @@ final class StreamViewModel: ObservableObject {
         let storedAcceleration = defaults.double(forKey: "maxAcceleration")
         self.maxAcceleration = storedAcceleration > 0 ? CGFloat(storedAcceleration) : 2.2
         self.invertScroll = defaults.bool(forKey: "invertScroll")
+        self.momentumScrolling = defaults.object(forKey: "momentumScrolling") as? Bool ?? true
 
         self.showKeyboardButton = defaults.object(forKey: "showKeyboardButton") as? Bool ?? true
         let storedX = defaults.object(forKey: "keyboardButtonX") as? Double
@@ -169,6 +183,10 @@ final class StreamViewModel: ObservableObject {
                 self?.streamDescription = "\(message.codec == .hevc ? "HEVC" : "H.264") \(message.width)x\(message.height)"
                 self?.streamSize = CGSize(width: Int(message.width), height: Int(message.height))
             }
+        }
+
+        client.onScreenshot = { [weak self] shot in
+            Task { @MainActor in self?.handleScreenshot(shot) }
         }
 
         client.onQualityChanged = { [weak self] quality in
@@ -239,7 +257,17 @@ final class StreamViewModel: ObservableObject {
         client?.sendPointerMove(dx: Int32(wholeX), dy: Int32(wholeY))
     }
 
-    func scroll(_ delta: CGPoint) {
+    func scroll(_ delta: CGPoint, phase: ScrollPhase) {
+        // Phase boundaries carry no movement but must still be sent:
+        // began and ended are the whole reason macOS treats a run of
+        // these as one gesture, and dropping them for having a zero
+        // delta would take rubber-banding with them.
+        if phase == .began || phase == .ended || phase == .momentumEnded {
+            scrollRemainder = .zero
+            client?.sendScroll(dx: 0, dy: 0, phase: phase)
+            return
+        }
+
         let direction: CGFloat = invertScroll ? -1 : 1
         let x = delta.x * scrollSensitivity * direction + scrollRemainder.x
         let y = delta.y * scrollSensitivity * direction + scrollRemainder.y
@@ -248,7 +276,75 @@ final class StreamViewModel: ObservableObject {
         scrollRemainder = CGPoint(x: x - wholeX, y: y - wholeY)
 
         guard wholeX != 0 || wholeY != 0 else { return }
-        client?.sendScroll(dx: Int32(wholeX), dy: Int32(wholeY))
+        client?.sendScroll(dx: Int32(wholeX), dy: Int32(wholeY), phase: phase)
+    }
+
+    func performGesture(_ gesture: SystemGesture) {
+        client?.sendGesture(gesture)
+        note(gesture.label)
+    }
+
+    // MARK: - Screenshots
+
+    func takeScreenshot() {
+        guard client != nil else { return }
+        note("Capturing…", holdFor: 10)
+        client?.requestScreenshot(format: .heic)
+    }
+
+    private func handleScreenshot(_ shot: ScreenshotMessage) {
+        guard shot.succeeded else {
+            note("Screenshot failed: \(shot.message)")
+            return
+        }
+        Task { await saveToPhotos(shot) }
+    }
+
+    /// `.addOnly` on purpose: writing a screenshot into the library
+    /// needs no ability to read what is already in there, and asking for
+    /// less is the difference between a prompt people accept and one
+    /// they think twice about.
+    private func saveToPhotos(_ shot: ScreenshotMessage) async {
+        let status = await PHPhotoLibrary.requestAuthorization(for: .addOnly)
+        guard status == .authorized || status == .limited else {
+            note("Allow photo access in Settings to save screenshots")
+            return
+        }
+
+        let stamp = Self.filenameFormatter.string(from: Date())
+        let options = PHAssetResourceCreationOptions()
+        options.originalFilename = "ControlMyMac \(stamp).\(shot.format.fileExtension)"
+        options.uniformTypeIdentifier = (shot.format == .heic ? UTType.heic : UTType.png).identifier
+
+        do {
+            try await PHPhotoLibrary.shared().performChanges {
+                let request = PHAssetCreationRequest.forAsset()
+                request.addResource(with: .photo, data: shot.data, options: options)
+            }
+            let megabytes = Double(shot.data.count) / 1_000_000
+            note("Saved \(shot.width)×\(shot.height) to Photos (\(String(format: "%.1f", megabytes)) MB)")
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+        } catch {
+            note("Could not save: \(error.localizedDescription)")
+        }
+    }
+
+    private static let filenameFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd 'at' HH.mm.ss"
+        return f
+    }()
+
+    /// A short-lived line over the video. Replaces whatever was there,
+    /// so a rapid sequence does not queue up behind itself.
+    private func note(_ text: String, holdFor seconds: Double = 2.5) {
+        screenshotStatusTask?.cancel()
+        screenshotStatus = text
+        screenshotStatusTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
+            guard !Task.isCancelled else { return }
+            self?.screenshotStatus = nil
+        }
     }
 
     func click(_ button: MouseButton, clickCount: UInt8) {

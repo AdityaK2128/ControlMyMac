@@ -10,7 +10,8 @@ import UIKit
 final class TrackpadUIView: UIView {
 
     var onMove: ((CGPoint) -> Void)?
-    var onScroll: ((CGPoint) -> Void)?
+    var onScroll: ((CGPoint, ScrollPhase) -> Void)?
+    var onGesture: ((SystemGesture) -> Void)?
     var onClick: ((MouseButton, UInt8) -> Void)?
     var onButton: ((MouseButton, Bool) -> Void)?
     var onDragEngaged: ((Bool) -> Void)?
@@ -18,6 +19,11 @@ final class TrackpadUIView: UIView {
 
     /// Upper bound on pointer acceleration, tunable from settings.
     var maxAcceleration: CGFloat = 2.2
+    /// Glide after a flick. Off means scrolling stops dead on lift,
+    /// which is accurate but not what a trackpad does.
+    var momentumScrolling = true
+
+    private var momentumTimer: Timer?
 
     private var isDragging = false
     /// How far this touch has travelled. A hold only counts as a drag if
@@ -71,6 +77,19 @@ final class TrackpadUIView: UIView {
         return g
     }()
 
+    /// Three fingers is what macOS itself uses for these, and here it
+    /// is unclaimed: move caps at one touch, scroll at two.
+    private lazy var threeFingerSwipes: [UISwipeGestureRecognizer] = {
+        let directions: [UISwipeGestureRecognizer.Direction] = [.up, .down, .left, .right]
+        return directions.map { direction in
+            let g = UISwipeGestureRecognizer(target: self,
+                                             action: #selector(handleThreeFingerSwipe))
+            g.numberOfTouchesRequired = 3
+            g.direction = direction
+            return g
+        }
+    }()
+
     private lazy var longPress: UILongPressGestureRecognizer = {
         let g = UILongPressGestureRecognizer(target: self, action: #selector(handleLongPress))
         g.minimumPressDuration = 0.5
@@ -90,7 +109,11 @@ final class TrackpadUIView: UIView {
         // A two-finger tap must lose to a three-finger tap, or opening
         // settings also fires a right click first.
         twoFingerTap.require(toFail: threeFingerTap)
-        [movePan, scrollPan, tap, twoFingerTap, threeFingerTap, longPress]
+        // A three-finger tap must lose to a three-finger swipe, or a
+        // flick that starts slowly opens settings on the way past.
+        threeFingerSwipes.forEach(threeFingerTap.require(toFail:))
+        ([movePan, scrollPan, tap, twoFingerTap, threeFingerTap, longPress]
+            + threeFingerSwipes as [UIGestureRecognizer])
             .forEach(addGestureRecognizer)
     }
 
@@ -125,10 +148,59 @@ final class TrackpadUIView: UIView {
     }
 
     @objc private func handleScroll(_ gesture: UIPanGestureRecognizer) {
-        guard gesture.state == .changed else { return }
-        let delta = gesture.translation(in: self)
-        gesture.setTranslation(.zero, in: self)
-        onScroll?(delta)
+        switch gesture.state {
+        case .began:
+            stopMomentum()
+            onScroll?(.zero, .began)
+
+        case .changed:
+            let delta = gesture.translation(in: self)
+            gesture.setTranslation(.zero, in: self)
+            onScroll?(delta, .changed)
+
+        case .ended, .cancelled:
+            onScroll?(.zero, .ended)
+            if momentumScrolling, gesture.state == .ended {
+                startMomentum(velocity: gesture.velocity(in: self))
+            }
+
+        default:
+            break
+        }
+    }
+
+    // MARK: - Momentum
+    //
+    // macOS will not generate glide for synthetic events, so if a flick
+    // is going to coast it has to coast from here. The decay constant is
+    // picked to land close to the system's own feel: fast at first, and
+    // under a second in total.
+
+    private func startMomentum(velocity: CGPoint) {
+        let speed = hypot(velocity.x, velocity.y)
+        // Below this a flick was really just a slow drag, and adding
+        // glide to it feels like the content slipping out from under you.
+        guard speed > 260 else { return }
+
+        var current = CGPoint(x: velocity.x / 60, y: velocity.y / 60)
+        let timer = Timer(timeInterval: 1.0 / 60.0, repeats: true) { [weak self] timer in
+            guard let self else { timer.invalidate(); return }
+            current.x *= 0.94
+            current.y *= 0.94
+            if hypot(current.x, current.y) < 0.4 {
+                self.onScroll?(.zero, .momentumEnded)
+                self.stopMomentum()
+                return
+            }
+            self.onScroll?(current, .momentum)
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        momentumTimer = timer
+    }
+
+    private func stopMomentum() {
+        momentumTimer?.invalidate()
+        momentumTimer = nil
     }
 
     @objc private func handleTap(_ gesture: UITapGestureRecognizer) {
@@ -146,6 +218,23 @@ final class TrackpadUIView: UIView {
     }
 
     @objc private func handleTwoFingerTap() { onClick?(.right, 1) }
+
+    /// Sideways is back and forward rather than Spaces: switching
+    /// Spaces exists only as a window-server hotkey, and those ignore
+    /// synthetic events. Swiping right goes back, matching the direction
+    /// the content moves on real hardware.
+    @objc private func handleThreeFingerSwipe(_ gesture: UISwipeGestureRecognizer) {
+        let action: SystemGesture
+        switch gesture.direction {
+        case .up:    action = .missionControl
+        case .down:  action = .showDesktop
+        case .left:  action = .navigateForward
+        case .right: action = .navigateBack
+        default:     return
+        }
+        onGesture?(action)
+        UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
+    }
     @objc private func handleThreeFingerTap() { onShowSettings?() }
 
     /// Press and hold *still*, then drag.
@@ -197,13 +286,15 @@ extension TrackpadUIView: UIGestureRecognizerDelegate {
 
 struct TrackpadView: UIViewRepresentable {
     let onMove: (CGPoint) -> Void
-    let onScroll: (CGPoint) -> Void
+    let onScroll: (CGPoint, ScrollPhase) -> Void
     let onClick: (MouseButton, UInt8) -> Void
     let onButton: (MouseButton, Bool) -> Void
     let onDragEngaged: (Bool) -> Void
     let onShowSettings: () -> Void
+    let onGesture: (SystemGesture) -> Void
     var dragLock: Bool
     var maxAcceleration: CGFloat
+    var momentumScrolling: Bool
 
     func makeUIView(context: Context) -> TrackpadUIView {
         let view = TrackpadUIView()
@@ -213,12 +304,15 @@ struct TrackpadView: UIViewRepresentable {
         view.onButton = onButton
         view.onDragEngaged = onDragEngaged
         view.onShowSettings = onShowSettings
+        view.onGesture = onGesture
         view.maxAcceleration = maxAcceleration
+        view.momentumScrolling = momentumScrolling
         return view
     }
 
     func updateUIView(_ uiView: TrackpadUIView, context: Context) {
         uiView.maxAcceleration = maxAcceleration
+        uiView.momentumScrolling = momentumScrolling
         if context.coordinator.lastDragLock != dragLock {
             context.coordinator.lastDragLock = dragLock
             uiView.setDragLock(dragLock)

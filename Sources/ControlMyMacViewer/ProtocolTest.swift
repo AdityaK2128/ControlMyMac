@@ -39,9 +39,39 @@ enum ProtocolTest {
             check("pointerButton preserves click count", m.button == .right && m.isDown && m.clickCount == 2)
         } else { check("pointerButton decodes", false) }
 
-        if case .scroll(let m)? = roundTrip(.scroll(ScrollMessage(deltaX: -7, deltaY: 42))) {
-            check("scroll preserves signs", m.deltaX == -7 && m.deltaY == 42)
+        if case .scroll(let m)? = roundTrip(.scroll(
+            ScrollMessage(deltaX: -7, deltaY: 42, phase: .momentum))) {
+            check("scroll preserves signs and phase",
+                  m.deltaX == -7 && m.deltaY == 42 && m.phase == .momentum)
         } else { check("scroll decodes", false) }
+
+        for gesture in SystemGesture.allCases {
+            if case .gesture(let m)? = roundTrip(.gesture(GestureMessage(gesture: gesture))) {
+                check("gesture \(gesture.label) round-trips", m.gesture == gesture)
+            } else { check("gesture \(gesture.label) decodes", false) }
+        }
+
+        if case .requestScreenshot(let m)? = roundTrip(.requestScreenshot(
+            RequestScreenshotMessage(format: .png))) {
+            check("requestScreenshot preserves format", m.format == .png)
+        } else { check("requestScreenshot decodes", false) }
+
+        // A megabyte of noise: the screenshot payload is far larger than
+        // anything else on this wire, and it is the one message where a
+        // length or offset mistake would not show up in a small case.
+        let blob = Data((0..<1_000_000).map { UInt8($0 % 251) })
+        if case .screenshot(let m)? = roundTrip(.screenshot(ScreenshotMessage(
+            succeeded: true, format: .heic, width: 3456, height: 2234, data: blob))) {
+            check("screenshot preserves a 1 MB payload byte for byte",
+                  m.succeeded && m.width == 3456 && m.height == 2234 && m.data == blob)
+        } else { check("screenshot decodes", false) }
+
+        if case .screenshot(let m)? = roundTrip(.screenshot(ScreenshotMessage(
+            succeeded: false, format: .heic, width: 0, height: 0,
+            message: "no display to capture"))) {
+            check("screenshot carries a failure reason",
+                  !m.succeeded && m.message == "no display to capture" && m.data.isEmpty)
+        } else { check("screenshot failure decodes", false) }
 
         let mods: KeyModifiers = [.command, .shift]
         if case .keyEvent(let m)? = roundTrip(.keyEvent(
