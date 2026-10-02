@@ -6,31 +6,25 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXFileReference section */
+		85673086EF6CFD3A1F8591AF /* ControlMyMac.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ControlMyMac.app; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		333A478BC7D55DC957E48DED /* Sources/ControlMyMacKit */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Sources/ControlMyMacKit;
+			sourceTree = "<group>";
+		};
 		A4E78D51C7AF34885265A1CA /* ControlMyMaciOS */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = ControlMyMaciOS;
 			sourceTree = "<group>";
 		};
-		333A478BC7D55DC957E48DED /* ControlMyMacKit */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = Sources/ControlMyMacKit;
-			sourceTree = "<group>";
-		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
-/* Begin PBXFileReference section */
-		85673086EF6CFD3A1F8591AF /* ControlMyMac.app */ = {
-			isa = PBXFileReference;
-			explicitFileType = wrapper.application;
-			includeInIndex = 0;
-			path = ControlMyMac.app;
-			sourceTree = BUILT_PRODUCTS_DIR;
-		};
-/* End PBXFileReference section */
-
 /* Begin PBXFrameworksBuildPhase section */
-		7561BFB015D8F536760CB671 = {
+		7561BFB015D8F536760CB671 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -40,15 +34,6 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		E50290A24C49A459B43487C5 = {
-			isa = PBXGroup;
-			children = (
-				A4E78D51C7AF34885265A1CA /* ControlMyMaciOS */,
-				333A478BC7D55DC957E48DED /* ControlMyMacKit */,
-				17E1D4981A9DED075A3F8B48 /* Products */,
-			);
-			sourceTree = "<group>";
-		};
 		17E1D4981A9DED075A3F8B48 /* Products */ = {
 			isa = PBXGroup;
 			children = (
@@ -57,24 +42,33 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
+		E50290A24C49A459B43487C5 = {
+			isa = PBXGroup;
+			children = (
+				A4E78D51C7AF34885265A1CA /* ControlMyMaciOS */,
+				333A478BC7D55DC957E48DED /* Sources/ControlMyMacKit */,
+				17E1D4981A9DED075A3F8B48 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
 		0E8A3AD980EC179856012B7E /* ControlMyMac */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 81E0CC479FEB861BE0CB6FCE;
+			buildConfigurationList = 81E0CC479FEB861BE0CB6FCE /* Build configuration list for PBXNativeTarget "ControlMyMac" */;
 			buildPhases = (
-				BCE16DD0260827ECF338C787,
-				7561BFB015D8F536760CB671,
-				0189424A5A60FED329FA868E,
+				BCE16DD0260827ECF338C787 /* Sources */,
+				7561BFB015D8F536760CB671 /* Frameworks */,
+				0189424A5A60FED329FA868E /* Resources */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
+				333A478BC7D55DC957E48DED /* Sources/ControlMyMacKit */,
 				A4E78D51C7AF34885265A1CA /* ControlMyMaciOS */,
-				333A478BC7D55DC957E48DED /* ControlMyMacKit */,
 			);
 			name = ControlMyMac;
 			productName = ControlMyMac;
@@ -96,7 +90,7 @@
 					};
 				};
 			};
-			buildConfigurationList = 011BA6E610F8D3ADDC48D997;
+			buildConfigurationList = 011BA6E610F8D3ADDC48D997 /* Build configuration list for PBXProject "ControlMyMac" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -116,7 +110,7 @@
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-		0189424A5A60FED329FA868E = {
+		0189424A5A60FED329FA868E /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -126,7 +120,7 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		BCE16DD0260827ECF338C787 = {
+		BCE16DD0260827ECF338C787 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -136,6 +130,34 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin XCBuildConfiguration section */
+		5FD7CB20C3C0A7C4C28C16DB /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = "";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = F682ZTG3KV;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = ControlMyMac;
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "ControlMyMac connects to your Mac over your Tailscale network to show its screen.";
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "ControlMyMac saves screenshots of your Mac's screen to your photo library.";
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.example.controlmymac.ios;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
 		671D9E2E95809E27B85B6A20 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -180,41 +202,13 @@
 			};
 			name = Release;
 		};
-		5FD7CB20C3C0A7C4C28C16DB /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = "";
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
-				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = ControlMyMac;
-				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "ControlMyMac connects to your Mac over your Tailscale network to show its screen.";
-				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "ControlMyMac saves screenshots of your Mac's screen to your photo library.";
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-				);
-				MARKETING_VERSION = 0.1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.example.controlmymac.ios;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = 1;
-			};
-			name = Debug;
-		};
 		AF694ED35853F54DD12B6EE6 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = "";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = F682ZTG3KV;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = ControlMyMac;
@@ -239,7 +233,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		011BA6E610F8D3ADDC48D997 = {
+		011BA6E610F8D3ADDC48D997 /* Build configuration list for PBXProject "ControlMyMac" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				671D9E2E95809E27B85B6A20 /* Debug */,
@@ -248,7 +242,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		81E0CC479FEB861BE0CB6FCE = {
+		81E0CC479FEB861BE0CB6FCE /* Build configuration list for PBXNativeTarget "ControlMyMac" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				5FD7CB20C3C0A7C4C28C16DB /* Debug */,

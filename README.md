@@ -171,9 +171,18 @@ Two things follow from this that are easy to get wrong:
 
 ```bash
 cp scripts/local.env.example scripts/local.env   # then edit it
-./scripts/build.sh
-open build/ControlMyMac.app
+./scripts/install.sh
 ```
+
+That builds the app and installs it to `/Applications`, which is where
+it needs to live — `scripts/build.sh` alone leaves it inside `build/`,
+where Spotlight and Launchpad will not find it and where `rm -rf build`
+deletes it. Replacing the bundle in place keeps the signature and
+identifier identical, so the Screen Recording and Accessibility grants
+survive a reinstall.
+
+`build.sh` only refreshes `build/`. Re-run `install.sh` to push a new
+build into `/Applications`.
 
 `scripts/local.env` is gitignored and holds the bundle identifier and
 Apple Team ID your builds sign with. Without it the build still works
@@ -246,15 +255,17 @@ Verify the encoder without any permissions:
 
 ## Two environment gotchas
 
-**The CommandLineTools toolchain is broken on this machine.** Its
+**CommandLineTools SwiftPM can be broken.** On some installs its
 `libPackageDescription.dylib` is missing symbols its own
 `.swiftinterface` advertises, so SwiftPM manifests fail to *link*.
-`scripts/build.sh` works around it by setting `DEVELOPER_DIR` to the
-Xcode install, which needs no `sudo`. Fixing it properly:
+`scripts/build.sh` sidesteps it by locating a full Xcode and setting
+`DEVELOPER_DIR` itself, which needs no `sudo` and keeps working when
+`xcode-select` points somewhere else.
 
-```bash
-sudo xcode-select -s /Applications/Xcode-beta.app
-```
+Do not export `DEVELOPER_DIR` by hand unless you know the path exists —
+a stale value (say, pointing at an Xcode-beta you have since replaced)
+overrides the script's own probe and fails the build with
+`missing DEVELOPER_DIR path`.
 
 **The `.app` bundle is not cosmetic.** A bare executable launched from a
 terminal has its TCC decisions attributed to the *terminal*, not to
